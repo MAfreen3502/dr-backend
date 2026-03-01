@@ -36,10 +36,9 @@ class Prediction(db.Model):
 # Load trained model
 # -------------------------------
 MODEL_PATH = os.path.join(BASE_DIR, "dr_efficientnet_model.h5")
-
 model = keras.models.load_model(MODEL_PATH)
 
-# ⚠️ Must be same order as training folder
+# ⚠️ Must be same order as training folders
 CLASS_NAMES = [
     "Healthy",
     "Mild DR",
@@ -83,11 +82,27 @@ def predict():
     save_path = os.path.join(upload_folder, file.filename)
     file.save(save_path)
 
-    img = prepare_image(save_path)
+    try:
+        img = prepare_image(save_path)
+    except Exception:
+        return jsonify({"error": "Invalid image file"}), 400
 
     preds = model.predict(img)
+
     idx = int(np.argmax(preds[0]))
     confidence = float(preds[0][idx])
+
+    # -------------------------------
+    # Invalid image rejection
+    # -------------------------------
+    CONF_THRESHOLD = 0.65
+
+    if confidence < CONF_THRESHOLD:
+        return jsonify({
+            "predicted_class": "Invalid image",
+            "confidence": confidence,
+            "message": "Please upload a valid retinal fundus image."
+        })
 
     predicted_class = CLASS_NAMES[idx]
 
